@@ -1,0 +1,23 @@
+[Unit]
+Description=Smart Document Intelligence Platform
+Documentation=https://github.com/abhiveeramallu/Smart-Document-Intelligence
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/Smart-Document-Intelligence
+Environment="COMPOSE_PROJECT_NAME=docintel"
+
+# Start command
+ExecStart=/usr/bin/docker compose -f docker-compose.fullstack.yml up -d --remove-orphans
+
+# Stop command
+ExecStop=/usr/bin/docker compose -f docker-compose.fullstack.yml down
+
+# Reload command
+ExecReload=/usr/bin/docker compose -f docker-compose.fullstack.yml up -d
+
+[Install]
+WantedBy=multi-user.target
