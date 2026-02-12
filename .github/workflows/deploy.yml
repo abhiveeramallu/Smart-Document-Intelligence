@@ -61,7 +61,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && needs.test.result == 'success'
+    if: github.ref == 'refs/heads/main' && needs.test.result == 'success' && (secrets.DEPLOY_HOST != '' || secrets.VPS_HOST != '')
     environment: production
     
     steps:
@@ -115,3 +115,8 @@ jobs:
       run: |
         echo "❌ Deployment failed!"
         # Add alert notification here
+
+    - name: Notify on skip
+      if: needs.deploy.result == 'skipped'
+      run: |
+        echo "⏭️ Deployment skipped (missing secrets)"
