@@ -28,7 +28,9 @@ def extract_text_from_pdf(path: Path) -> str:
 
 def extract_text_from_docx(path: Path) -> str:
     doc = DocxDocument(str(path))
-    parts = [paragraph.text.strip() for paragraph in doc.paragraphs if paragraph.text.strip()]
+    parts = [
+        paragraph.text.strip() for paragraph in doc.paragraphs if paragraph.text.strip()
+    ]
     return "\n".join(parts).strip()
 
 

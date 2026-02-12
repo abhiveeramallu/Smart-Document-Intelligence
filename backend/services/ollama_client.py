@@ -77,7 +77,9 @@ class OllamaClient:
         messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
         user_message: dict[str, Any] = {"role": "user", "content": user_prompt}
         if images:
-            user_message["images"] = [base64.b64encode(item).decode("utf-8") for item in images]
+            user_message["images"] = [
+                base64.b64encode(item).decode("utf-8") for item in images
+            ]
         messages.append(user_message)
 
         payload = {
