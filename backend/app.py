@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 
 try:
     from config import (
+        CORS_ORIGINS,
         DB_PATH,
         MAX_UPLOAD_BYTES,
         OLLAMA_BASE_URL,
@@ -40,6 +41,7 @@ try:
     from services.ollama_client import OllamaClient, OllamaConfig
 except ModuleNotFoundError:
     from backend.config import (
+        CORS_ORIGINS,
         DB_PATH,
         MAX_UPLOAD_BYTES,
         OLLAMA_BASE_URL,
@@ -81,12 +83,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -257,37 +257,31 @@ VITE_API_BASE=http://127.0.0.1:8000
 - Metadata, analyses, and entities are stored in local SQLite (`backend/data/document_intel.db`)
 - AI inference is performed through local Ollama endpoint
 
-## Run With Docker Compose
+## Deploy (Vercel + Render)
 
-This setup runs:
-- `web` (Nginx + built React frontend) on `http://localhost:8080`
-- `backend` (FastAPI) on internal Docker network
-- `ollama` for local LLM inference
+Recommended split:
+- Frontend on Vercel (project root: `frontend`)
+- Backend on Render (FastAPI web service)
 
-### 1) Build and start containers
+### Render backend settings
 
-```bash
-docker compose build
-docker compose up -d
-```
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn backend.app:app --host 0.0.0.0 --port $PORT`
+- Environment:
+  - `DOC_INTEL_DATA_DIR=/var/data`
+  - `CORS_ORIGINS=https://<your-vercel-domain>`
+  - `OLLAMA_BASE_URL=<your-ollama-endpoint>`
+  - `OLLAMA_MODEL=llama3.2:3b`
 
-### 2) Pull the Ollama model (first run)
+Note: For persistent SQLite/uploads, attach a Render disk and point `DOC_INTEL_DATA_DIR` to that mount path.
 
-```bash
-docker compose exec ollama ollama pull llama3.2:3b
-docker compose restart backend
-```
+### Vercel frontend settings
 
-### 3) Open the app
-
-- UI: `http://localhost:8080`
-- API health: `http://localhost:8080/api/health`
-
-### Notes
-
-- Uploaded files and SQLite DB are stored in Docker volume `backend_data`.
-- Ollama models are stored in Docker volume `ollama_data`.
-- To use a different model, set `OLLAMA_MODEL` in your shell before `docker compose up`.
+- Root directory: `frontend`
+- Build command: `npm run build`
+- Output directory: `dist`
+- Environment:
+  - `VITE_API_BASE=https://<your-render-backend-domain>`
 
 ## Troubleshooting
 
