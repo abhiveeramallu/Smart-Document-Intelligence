@@ -257,6 +257,38 @@ VITE_API_BASE=http://127.0.0.1:8000
 - Metadata, analyses, and entities are stored in local SQLite (`backend/data/document_intel.db`)
 - AI inference is performed through local Ollama endpoint
 
+## Run With Docker Compose
+
+This setup runs:
+- `web` (Nginx + built React frontend) on `http://localhost:8080`
+- `backend` (FastAPI) on internal Docker network
+- `ollama` for local LLM inference
+
+### 1) Build and start containers
+
+```bash
+docker compose build
+docker compose up -d
+```
+
+### 2) Pull the Ollama model (first run)
+
+```bash
+docker compose exec ollama ollama pull llama3.2:3b
+docker compose restart backend
+```
+
+### 3) Open the app
+
+- UI: `http://localhost:8080`
+- API health: `http://localhost:8080/api/health`
+
+### Notes
+
+- Uploaded files and SQLite DB are stored in Docker volume `backend_data`.
+- Ollama models are stored in Docker volume `ollama_data`.
+- To use a different model, set `OLLAMA_MODEL` in your shell before `docker compose up`.
+
 ## Troubleshooting
 
 - `Error: listen tcp 127.0.0.1:11434: bind: address already in use`
