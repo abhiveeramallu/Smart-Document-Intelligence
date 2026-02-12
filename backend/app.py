@@ -26,8 +26,17 @@ try:
         UPLOAD_DIR,
     )
     from database import Database
-    from services.document_parser import build_preview, chunk_text, parse_document, sha256_bytes
-    from services.intelligence import analyze_document, compare_documents, summarize_document
+    from services.document_parser import (
+        build_preview,
+        chunk_text,
+        parse_document,
+        sha256_bytes,
+    )
+    from services.intelligence import (
+        analyze_document,
+        compare_documents,
+        summarize_document,
+    )
     from services.ollama_client import OllamaClient, OllamaConfig
 except ModuleNotFoundError:
     from backend.config import (
@@ -46,7 +55,11 @@ except ModuleNotFoundError:
         parse_document,
         sha256_bytes,
     )
-    from backend.services.intelligence import analyze_document, compare_documents, summarize_document
+    from backend.services.intelligence import (
+        analyze_document,
+        compare_documents,
+        summarize_document,
+    )
     from backend.services.ollama_client import OllamaClient, OllamaConfig
 
 
@@ -81,7 +94,11 @@ app.add_middleware(
 
 db = Database(DB_PATH)
 db.init_schema()
-ollama = OllamaClient(OllamaConfig(base_url=OLLAMA_BASE_URL, model=OLLAMA_MODEL, vision_model=OLLAMA_VISION_MODEL))
+ollama = OllamaClient(
+    OllamaConfig(
+        base_url=OLLAMA_BASE_URL, model=OLLAMA_MODEL, vision_model=OLLAMA_VISION_MODEL
+    )
+)
 
 
 MEDIA_TYPES = {
@@ -120,7 +137,9 @@ def parse_json_field(raw: str | None, fallback: Any) -> Any:
 def get_document_or_404(document_id: str) -> dict[str, Any]:
     row = db.fetch_one("SELECT * FROM documents WHERE id = ?", (document_id,))
     if row is None:
-        raise HTTPException(status_code=404, detail=f"Document not found: {document_id}")
+        raise HTTPException(
+            status_code=404, detail=f"Document not found: {document_id}"
+        )
     return row
 
 
@@ -157,7 +176,9 @@ def list_entities(document_id: str) -> list[dict[str, Any]]:
     return rows
 
 
-def save_analysis(document_id: str, analysis_type: str, level: str, result: dict[str, Any]) -> None:
+def save_analysis(
+    document_id: str, analysis_type: str, level: str, result: dict[str, Any]
+) -> None:
     db.execute(
         """
         INSERT INTO document_analyses(document_id, analysis_type, level, result_json, created_at)
@@ -283,10 +304,14 @@ def health() -> dict[str, Any]:
 @app.get("/dashboard")
 def dashboard() -> dict[str, Any]:
     stats = {
-        "documents": (db.fetch_one("SELECT COUNT(*) AS c FROM documents") or {"c": 0})["c"],
+        "documents": (db.fetch_one("SELECT COUNT(*) AS c FROM documents") or {"c": 0})[
+            "c"
+        ],
     }
 
-    recent_documents = db.fetch_all("SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 8")
+    recent_documents = db.fetch_all(
+        "SELECT * FROM documents ORDER BY uploaded_at DESC LIMIT 8"
+    )
     return {
         "stats": stats,
         "recent_documents": [format_document_row(row) for row in recent_documents],
@@ -338,9 +363,13 @@ async def upload_document(
     try:
         extracted_text = parse_document(stored_path, file_type)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to process file: {exc}") from exc
+        raise HTTPException(
+            status_code=400, detail=f"Failed to process file: {exc}"
+        ) from exc
 
-    preview_text = build_preview(extracted_text) if extracted_text else "No text extracted."
+    preview_text = (
+        build_preview(extracted_text) if extracted_text else "No text extracted."
+    )
     uploaded_at = now_iso()
 
     db.execute(
@@ -388,7 +417,10 @@ async def upload_document(
         try:
             auto_extract = run_auto_analysis(document)
         except Exception as exc:
-            db.execute("UPDATE documents SET analysis_status = ? WHERE id = ?", ("failed", doc_id))
+            db.execute(
+                "UPDATE documents SET analysis_status = ? WHERE id = ?",
+                ("failed", doc_id),
+            )
             auto_extract = {
                 "summary_brief": "Automatic AI extraction failed.",
                 "summary_detailed": str(exc),
@@ -431,7 +463,9 @@ def delete_document(document_id: str) -> dict[str, Any]:
         try:
             file_path.unlink()
         except OSError as exc:
-            raise HTTPException(status_code=500, detail=f"Failed to delete file from disk: {exc}") from exc
+            raise HTTPException(
+                status_code=500, detail=f"Failed to delete file from disk: {exc}"
+            ) from exc
 
     db.execute("DELETE FROM documents WHERE id = ?", (document_id,))
     return {"status": "deleted", "document_id": document_id}
@@ -475,7 +509,10 @@ def read_document_file(document_id: str) -> FileResponse:
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File no longer exists on disk.")
 
-    media_type = MEDIA_TYPES.get(document["file_type"]) or mimetypes.guess_type(document["filename"])[0]
+    media_type = (
+        MEDIA_TYPES.get(document["file_type"])
+        or mimetypes.guess_type(document["filename"])[0]
+    )
     return FileResponse(
         path=file_path,
         media_type=media_type,
@@ -535,7 +572,10 @@ def analyze_document_endpoint(document_id: str) -> dict[str, Any]:
     )
     save_analysis(document_id, "auto_extract", "default", result)
     replace_entities(document_id, result.get("entities", []))
-    db.execute("UPDATE documents SET analysis_status = ? WHERE id = ?", ("complete", document_id))
+    db.execute(
+        "UPDATE documents SET analysis_status = ? WHERE id = ?",
+        ("complete", document_id),
+    )
     return {"document_id": document_id, "analysis": result}
 
 
@@ -570,11 +610,15 @@ def compare(payload: CompareRequest) -> dict[str, Any]:
 def export_data(payload: ExportRequest) -> StreamingResponse:
     selected_ids = payload.document_ids
     if not selected_ids:
-        selected_rows = db.fetch_all("SELECT id FROM documents ORDER BY uploaded_at DESC")
+        selected_rows = db.fetch_all(
+            "SELECT id FROM documents ORDER BY uploaded_at DESC"
+        )
         selected_ids = [row["id"] for row in selected_rows]
 
     if not selected_ids:
-        raise HTTPException(status_code=400, detail="No documents available for export.")
+        raise HTTPException(
+            status_code=400, detail="No documents available for export."
+        )
 
     placeholders = ",".join("?" for _ in selected_ids)
     docs = db.fetch_all(
@@ -608,7 +652,9 @@ def export_data(payload: ExportRequest) -> StreamingResponse:
             "documents": [
                 {
                     **format_document_row(doc),
-                    "entities": [row for row in entities if row["document_id"] == doc["id"]],
+                    "entities": [
+                        row for row in entities if row["document_id"] == doc["id"]
+                    ],
                     "analysis": analysis_map.get(doc["id"], {}),
                 }
                 for doc in docs
@@ -641,7 +687,9 @@ def export_data(payload: ExportRequest) -> StreamingResponse:
             doc = doc_by_id.get(entity["document_id"])
             if not doc:
                 continue
-            summary_brief = str(analysis_map.get(doc["id"], {}).get("summary_brief") or "")
+            summary_brief = str(
+                analysis_map.get(doc["id"], {}).get("summary_brief") or ""
+            )
             writer.writerow(
                 {
                     "document_id": doc["id"],
@@ -661,7 +709,12 @@ def export_data(payload: ExportRequest) -> StreamingResponse:
         media_type = "text/csv"
 
     elif export_format == "report":
-        lines: list[str] = ["# Smart Document Intelligence Report", "", f"Generated: {now_iso()}", ""]
+        lines: list[str] = [
+            "# Smart Document Intelligence Report",
+            "",
+            f"Generated: {now_iso()}",
+            "",
+        ]
         for doc in docs:
             lines.append(f"## {doc['filename']} (v{doc['version_number']})")
             lines.append(f"- Document ID: `{doc['id']}`")
@@ -672,7 +725,9 @@ def export_data(payload: ExportRequest) -> StreamingResponse:
             if analysis:
                 lines.append(f"- Brief Summary: {analysis.get('summary_brief', '')}")
 
-            doc_entities = [entity for entity in entities if entity["document_id"] == doc["id"]][:15]
+            doc_entities = [
+                entity for entity in entities if entity["document_id"] == doc["id"]
+            ][:15]
             if doc_entities:
                 lines.append("- Extracted Entities:")
                 for entity in doc_entities:
@@ -687,7 +742,10 @@ def export_data(payload: ExportRequest) -> StreamingResponse:
         media_type = "text/markdown"
 
     else:
-        raise HTTPException(status_code=400, detail="Unsupported export format. Use json, csv, or report.")
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported export format. Use json, csv, or report.",
+        )
 
     return StreamingResponse(
         io.BytesIO(raw),

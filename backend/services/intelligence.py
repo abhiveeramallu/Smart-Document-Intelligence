@@ -166,10 +166,10 @@ def analyze_document(
     system_prompt = (
         "You are a local document intelligence engine. "
         "Return strict JSON with this schema: "
-        "{\"summary_brief\":string,\"summary_detailed\":string,\"bullet_points\":string[],"
-        "\"entities\":{\"names\":[],\"dates\":[],\"amounts\":[],\"addresses\":[],"
-        "\"organizations\":[],\"emails\":[],\"phones\":[]},"
-        "\"highlights\":[{\"label\":string,\"value\":string,\"snippet\":string}]}"
+        '{"summary_brief":string,"summary_detailed":string,"bullet_points":string[],'
+        '"entities":{"names":[],"dates":[],"amounts":[],"addresses":[],'
+        '"organizations":[],"emails":[],"phones":[]},'
+        '"highlights":[{"label":string,"value":string,"snippet":string}]}'
     )
     user_prompt = (
         f"Document filename: {filename}\n"
@@ -188,13 +188,25 @@ def analyze_document(
     except Exception:
         model_output = {}
 
-    summary_brief = str(model_output.get("summary_brief") or _brief_summary(text)).strip()
-    summary_detailed = str(model_output.get("summary_detailed") or _detailed_summary(text)).strip()
+    summary_brief = str(
+        model_output.get("summary_brief") or _brief_summary(text)
+    ).strip()
+    summary_detailed = str(
+        model_output.get("summary_detailed") or _detailed_summary(text)
+    ).strip()
 
     bullets_raw = model_output.get("bullet_points", [])
-    bullet_points = [str(item).strip() for item in bullets_raw if str(item).strip()] if isinstance(bullets_raw, list) else []
+    bullet_points = (
+        [str(item).strip() for item in bullets_raw if str(item).strip()]
+        if isinstance(bullets_raw, list)
+        else []
+    )
     if not bullet_points:
-        bullet_points = [point for point in re.split(r"[\n•-]+", _brief_summary(text)) if point.strip()][:5]
+        bullet_points = [
+            point
+            for point in re.split(r"[\n•-]+", _brief_summary(text))
+            if point.strip()
+        ][:5]
 
     highlights_raw = model_output.get("highlights", [])
     highlights: list[dict[str, str]] = []
@@ -211,7 +223,11 @@ def analyze_document(
     entities = normalize_entities(model_output, text)
     if not highlights and entities:
         highlights = [
-            {"label": entity.entity_type, "value": entity.value, "snippet": entity.snippet}
+            {
+                "label": entity.entity_type,
+                "value": entity.value,
+                "snippet": entity.snippet,
+            }
             for entity in entities[:10]
         ]
 
@@ -225,32 +241,46 @@ def analyze_document(
     }
 
 
-def summarize_document(*, text: str, level: str, ollama: OllamaClient) -> dict[str, Any]:
+def summarize_document(
+    *, text: str, level: str, ollama: OllamaClient
+) -> dict[str, Any]:
     clipped_text = text[:MAX_CONTEXT_CHARS]
     instructions = {
         "brief": "Produce a concise 2-3 sentence summary.",
         "detailed": "Produce a detailed summary in 3-6 paragraphs.",
         "bullets": "Produce a concise bullet-point summary.",
     }
-    system_prompt = (
-        "Return strict JSON with schema {\"level\":string,\"content\":string,\"bullets\":string[]}"
-    )
+    system_prompt = 'Return strict JSON with schema {"level":string,"content":string,"bullets":string[]}'
     user_prompt = (
         f"Requested level: {level}\n"
         f"Instruction: {instructions.get(level, instructions['brief'])}\n"
         f"Document content:\n{clipped_text if clipped_text else '[no extracted text]'}"
     )
     try:
-        response = ollama.chat_json(system_prompt=system_prompt, user_prompt=user_prompt)
+        response = ollama.chat_json(
+            system_prompt=system_prompt, user_prompt=user_prompt
+        )
     except Exception:
         response = {}
 
     if level == "bullets":
         raw_bullets = response.get("bullets", [])
-        bullets = [str(item).strip() for item in raw_bullets if str(item).strip()] if isinstance(raw_bullets, list) else []
+        bullets = (
+            [str(item).strip() for item in raw_bullets if str(item).strip()]
+            if isinstance(raw_bullets, list)
+            else []
+        )
         if not bullets:
-            bullets = [line.strip() for line in re.split(r"[\n•-]+", _detailed_summary(text)) if line.strip()][:8]
-        return {"level": level, "content": "\n".join(f"- {item}" for item in bullets), "bullets": bullets}
+            bullets = [
+                line.strip()
+                for line in re.split(r"[\n•-]+", _detailed_summary(text))
+                if line.strip()
+            ][:8]
+        return {
+            "level": level,
+            "content": "\n".join(f"- {item}" for item in bullets),
+            "bullets": bullets,
+        }
 
     content = str(response.get("content") or "").strip()
     if not content:
@@ -269,7 +299,9 @@ def compare_documents(
     left_lines = [line for line in left_text.splitlines() if line.strip()]
     right_lines = [line for line in right_text.splitlines() if line.strip()]
 
-    similarity = difflib.SequenceMatcher(None, left_text[:MAX_CONTEXT_CHARS], right_text[:MAX_CONTEXT_CHARS]).ratio()
+    similarity = difflib.SequenceMatcher(
+        None, left_text[:MAX_CONTEXT_CHARS], right_text[:MAX_CONTEXT_CHARS]
+    ).ratio()
     diff_lines = list(
         difflib.unified_diff(
             left_lines[:180],
@@ -283,7 +315,7 @@ def compare_documents(
 
     system_prompt = (
         "Compare two document versions and return strict JSON schema: "
-        "{\"summary\":string,\"changes\":[{\"type\":string,\"description\":string,\"impact\":string}]}"
+        '{"summary":string,"changes":[{"type":string,"description":string,"impact":string}]}'
     )
     user_prompt = (
         f"Left document ({left_name}):\n{left_text[:MAX_CONTEXT_CHARS]}\n\n"
@@ -292,11 +324,15 @@ def compare_documents(
 
     response: dict[str, Any] = {}
     try:
-        response = ollama.chat_json(system_prompt=system_prompt, user_prompt=user_prompt)
+        response = ollama.chat_json(
+            system_prompt=system_prompt, user_prompt=user_prompt
+        )
     except Exception:
         response = {}
 
-    changes = response.get("changes", []) if isinstance(response.get("changes"), list) else []
+    changes = (
+        response.get("changes", []) if isinstance(response.get("changes"), list) else []
+    )
     normalized_changes: list[dict[str, str]] = []
     for change in changes:
         if not isinstance(change, dict):
@@ -311,9 +347,17 @@ def compare_documents(
 
     if not normalized_changes:
         for line in diff_lines[:12]:
-            if line.startswith("+++") or line.startswith("---") or line.startswith("@@"):
+            if (
+                line.startswith("+++")
+                or line.startswith("---")
+                or line.startswith("@@")
+            ):
                 continue
-            change_type = "removed" if line.startswith("-") else "added" if line.startswith("+") else "context"
+            change_type = (
+                "removed"
+                if line.startswith("-")
+                else "added" if line.startswith("+") else "context"
+            )
             normalized_changes.append(
                 {
                     "type": change_type,

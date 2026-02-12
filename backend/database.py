@@ -103,7 +103,9 @@ class Database:
                 conn.executemany(sql, seq_of_params)
                 conn.commit()
 
-    def fetch_one(self, sql: str, params: tuple[Any, ...] = ()) -> dict[str, Any] | None:
+    def fetch_one(
+        self, sql: str, params: tuple[Any, ...] = ()
+    ) -> dict[str, Any] | None:
         with self._connect() as conn:
             row = conn.execute(sql, params).fetchone()
         if row is None:
