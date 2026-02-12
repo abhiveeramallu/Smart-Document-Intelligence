@@ -9,8 +9,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Remove lockfile to avoid platform mismatch (macOS vs Linux)
+# and install fresh dependencies in container
+RUN rm -f package-lock.json && npm install
 
 # Copy source code
 COPY . .
