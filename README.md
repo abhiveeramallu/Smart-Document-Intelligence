@@ -257,32 +257,6 @@ VITE_API_BASE=http://127.0.0.1:8000
 - Metadata, analyses, and entities are stored in local SQLite (`backend/data/document_intel.db`)
 - AI inference is performed through local Ollama endpoint
 
-## Deploy (Vercel + Render)
-
-Recommended split:
-- Frontend on Vercel (project root: `frontend`)
-- Backend on Render (FastAPI web service)
-
-### Render backend settings
-
-- Build command: `pip install -r requirements.txt`
-- Start command: `uvicorn backend.app:app --host 0.0.0.0 --port $PORT`
-- Environment:
-  - `DOC_INTEL_DATA_DIR=/var/data`
-  - `CORS_ORIGINS=https://<your-vercel-domain>`
-  - `OLLAMA_BASE_URL=<your-ollama-endpoint>`
-  - `OLLAMA_MODEL=llama3.2:3b`
-
-Note: For persistent SQLite/uploads, attach a Render disk and point `DOC_INTEL_DATA_DIR` to that mount path.
-
-### Vercel frontend settings
-
-- Root directory: `frontend`
-- Build command: `npm run build`
-- Output directory: `dist`
-- Environment:
-  - `VITE_API_BASE=https://<your-render-backend-domain>`
-
 ## Troubleshooting
 
 - `Error: listen tcp 127.0.0.1:11434: bind: address already in use`
