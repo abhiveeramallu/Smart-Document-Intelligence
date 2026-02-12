@@ -6,7 +6,6 @@ on:
     paths-ignore:
       - '**.md'
       - 'docs/**'
-      - '.github/**'
   pull_request:
     branches: [ main ]
 
@@ -59,51 +58,10 @@ jobs:
         cd frontend
         npm test -- --passWithNoTests --watchAll=false || true
 
-  build-and-push:
+  deploy:
     needs: test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-    
-    - name: Build and push backend
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.backend.prod
-        push: true
-        tags: |
-          ${{ secrets.DOCKER_USERNAME }}/docintel-backend:latest
-          ${{ secrets.DOCKER_USERNAME }}/docintel-backend:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-    
-    - name: Build and push frontend
-      uses: docker/build-push-action@v5
-      with:
-        context: ./frontend
-        file: ./frontend/Dockerfile.frontend.prod
-        push: true
-        tags: |
-          ${{ secrets.DOCKER_USERNAME }}/docintel-frontend:latest
-          ${{ secrets.DOCKER_USERNAME }}/docintel-frontend:${{ github.sha }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && needs.test.result == 'success'
     environment: production
     
     steps:
@@ -114,27 +72,30 @@ jobs:
         username: ${{ secrets.VPS_USER }}
         key: ${{ secrets.SSH_PRIVATE_KEY }}
         script: |
+          set -e
           cd /opt/Smart-Document-Intelligence
           
           # Pull latest changes
           git fetch origin main
           git reset --hard origin/main
           
-          # Update environment if needed
-          cp .env.production .env
+          # Update environment if present
+          if [ -f .env.production ]; then
+            cp .env.production .env
+          fi
           
-          # Pull latest images
-          docker compose -f docker-compose.fullstack.yml pull
+          # Pull external images (best effort)
+          docker compose -f docker-compose.fullstack.yml pull ollama nginx || true
           
-          # Restart services
-          docker compose -f docker-compose.fullstack.yml up -d --remove-orphans
+          # Rebuild app images and restart services
+          docker compose -f docker-compose.fullstack.yml up -d --build --remove-orphans
           
           # Cleanup old images
           docker image prune -f
           
-          # Health check
+          # Health check via nginx
           sleep 30
-          curl -f http://localhost:8000/health || exit 1
+          curl -fsS http://localhost:3000/api/health > /dev/null || exit 1
           echo "Deployment successful!"
 
   notify:
