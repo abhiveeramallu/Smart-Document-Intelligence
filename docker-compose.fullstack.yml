@@ -1,0 +1,122 @@
+services:
+  # Ollama - Local LLM (INTERNAL ONLY, not exposed publicly)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: docintel-ollama
+    restart: unless-stopped
+    # SECURITY: No ports exposed - only accessible within Docker network
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - docintel_network
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4'
+        reservations:
+          memory: 4G
+          cpus: '2'
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend.prod
+    container_name: docintel-backend
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+      - OLLAMA_VISION_MODEL=${OLLAMA_VISION_MODEL:-}
+      - DOC_INTEL_DATA_DIR=/app/backend/data
+      - MAX_UPLOAD_BYTES=${MAX_UPLOAD_BYTES:-36700160}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PYTHONUNBUFFERED=1
+      - ENVIRONMENT=production
+    volumes:
+      - backend_data:/app/backend/data
+      - ./logs:/app/logs
+    networks:
+      - docintel_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: docintel-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/sites-enabled:/etc/nginx/sites-enabled:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    depends_on:
+      - backend
+    networks:
+      - docintel_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend (Static files served by Nginx, or can be separate container)
+  # For production, we build frontend and serve via Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend.prod
+    container_name: docintel-frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    environment:
+      - VITE_API_BASE=/api
+    networks:
+      - docintel_network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  docintel_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  ollama_data:
+    driver: local
+  backend_data:
+    driver: local
